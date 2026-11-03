@@ -76,7 +76,7 @@ function ResolvedInvite({ inviteId }: { inviteId: string }) {
     );
   }, [inviteId, user.uid]);
 
-  // Runs again whenever this route becomes visible, so a stale state never lingers.
+  // Runs again whenever this route becomes visible.
   useEffect(() => {
     let current = true;
     resolve().then((result) => {
@@ -84,6 +84,8 @@ function ResolvedInvite({ inviteId }: { inviteId: string }) {
     });
     return () => {
       current = false;
+      // Routes stay mounted while hidden, so don't act on the old result when this one returns.
+      setResolved({ state: "loading" });
     };
   }, [resolve]);
 

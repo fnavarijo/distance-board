@@ -302,6 +302,28 @@ describe("notes", () => {
     );
   });
 
+  it("rejects a note delete that also touches the title", async () => {
+    const { alice } = accounts;
+    const noteId = await addNote(alice.db, alice.actor, boardId, itemId, "Mine");
+    await expectDenied(
+      updateDoc(itemDoc(alice), { [`notes.${noteId}`]: deleteField(), title: "Sneaky" }),
+    );
+  });
+
+  it("rejects title, order and completion writes that also touch notes", async () => {
+    const { alice } = accounts;
+    await addNote(alice.db, alice.actor, boardId, itemId, "Keep me");
+    await expectDenied(updateDoc(itemDoc(alice), { title: "New", notes: {} }));
+    await expectDenied(updateDoc(itemDoc(alice), { order: "a5", notes: {} }));
+    await expectDenied(
+      updateDoc(itemDoc(alice), {
+        completedBy: alice.actor,
+        completedAt: serverTimestamp(),
+        notes: {},
+      }),
+    );
+  });
+
   it("rejects replacing a note's author by rewriting it", async () => {
     const { alice, bob } = accounts;
     const noteId = await addNote(alice.db, alice.actor, boardId, itemId, "Mine");

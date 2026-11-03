@@ -273,6 +273,7 @@ All of these are free dev tooling, consistent with section 2.
 
 - **Vitest:** the runner for TEST-1 and TEST-2. The requirements name no unit runner.
 - **`firebase-tools`, plus Firebase project config:** for deploying rules. No hosting or Functions are configured.
+- **`dotenv`:** loads the local env files for the rule tests and Playwright.
 
 ## Testing Decisions
 

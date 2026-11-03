@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { AppHeader } from "@/components/app-header";
 import { AuthGate } from "@/components/auth-gate";
 import { useUser } from "@/components/auth-provider";
@@ -26,16 +26,22 @@ function BoardContent({ boardId }: { boardId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   // Lives in an effect inside the board route, so it detaches when the route is hidden (COST-6).
-  useEffect(
-    () =>
-      subscribeToBoard(
-        getFirebase().db,
-        boardId,
-        (board) => setState(board ? { status: "ready", board } : { status: "unavailable" }),
-        () => setState({ status: "unavailable" }),
-      ),
-    [boardId],
-  );
+  useEffect(() => {
+    const stop = subscribeToBoard(
+      getFirebase().db,
+      boardId,
+      (board) => setState(board ? { status: "ready", board } : { status: "unavailable" }),
+      () => setState({ status: "unavailable" }),
+    );
+    return () => {
+      stop();
+      // Routes stay mounted while hidden, so don't show the old board when this one returns.
+      setState({ status: "loading" });
+    };
+  }, [boardId]);
+
+  // Without this, returning to a board after leaving it would load forever.
+  useLayoutEffect(() => () => setLeaving(false), []);
 
   async function leave() {
     setLeaving(true);

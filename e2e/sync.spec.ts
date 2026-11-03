@@ -207,3 +207,20 @@ test("a dead invite and someone else's board get friendly pages", async ({ brows
   await alice.goto("/boards/no-such-board");
   await expect(alice.getByRole("heading", { name: "We can't find this board" })).toBeVisible();
 });
+
+test("going back to a board you left shows a friendly page, not endless loading", async ({ browser }) => {
+  const alice = await signedInPage(browser, 1);
+  await alice.getByLabel("Board name").fill("Left behind");
+  await alice.getByRole("button", { name: "Create" }).click();
+  await expect(alice.getByRole("heading", { name: "Left behind" })).toBeVisible();
+
+  // Client-side navigation only, so the board route stays mounted but hidden.
+  await alice.getByRole("link", { name: "Your boards" }).click();
+  await alice.getByRole("link", { name: "Left behind" }).click();
+  await expect(alice.getByRole("heading", { name: "Left behind" })).toBeVisible();
+  await leave(alice, "Delete board");
+
+  await alice.goBack();
+  await alice.goBack();
+  await expect(alice.getByRole("heading", { name: "We can't find this board" })).toBeVisible();
+});

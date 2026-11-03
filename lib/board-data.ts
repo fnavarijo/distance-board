@@ -14,6 +14,7 @@ import {
   onSnapshot,
   query,
   serverTimestamp,
+  setDoc,
   Timestamp,
   updateDoc,
   where,
@@ -142,15 +143,13 @@ export async function createBoard(
   name: string,
 ): Promise<string> {
   const ref = doc(collection(db, "boards"));
-  const batch = writeBatch(db);
-  batch.set(ref, {
+  await setDoc(ref, {
     name,
     members: [actor.uid],
     currentInviteId: null,
     createdBy: actor.uid,
     createdAt: serverTimestamp(),
   });
-  await batch.commit();
   return ref.id;
 }
 
@@ -312,8 +311,7 @@ export async function addItem(
   title: string,
 ): Promise<string> {
   const ref = doc(itemsRef(db, boardId));
-  const batch = writeBatch(db);
-  batch.set(ref, {
+  await setDoc(ref, {
     title,
     order: keyForTop(items),
     createdBy: actor,
@@ -322,7 +320,6 @@ export async function addItem(
     completedAt: null,
     notes: {},
   });
-  await batch.commit();
   return ref.id;
 }
 

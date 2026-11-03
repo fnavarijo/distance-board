@@ -72,7 +72,8 @@ export function BoardItems({ boardId }: { boardId: string }) {
   function submit(event: FormEvent) {
     event.preventDefault();
     const next = title.trim();
-    if (!next) return;
+    // Before the first snapshot the top of the list isn't known (ITEM-3).
+    if (!next || items === null) return;
     setTitle("");
     run(addItem(getFirebase().db, user, boardId, all, next));
   }
@@ -90,7 +91,7 @@ export function BoardItems({ boardId }: { boardId: string }) {
           placeholder="What should you two do?"
           aria-label="New idea"
         />
-        <Button type="submit" disabled={!title.trim()}>
+        <Button type="submit" disabled={!title.trim() || items === null}>
           Add
         </Button>
       </form>
