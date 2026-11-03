@@ -224,3 +224,28 @@ test("going back to a board you left shows a friendly page, not endless loading"
   await alice.goBack();
   await expect(alice.getByRole("heading", { name: "We can't find this board" })).toBeVisible();
 });
+
+test("the old invite link is dead as soon as a new link is shown", async ({ browser }) => {
+  const alice = await signedInPage(browser, 1);
+  await alice.getByLabel("Board name").fill("New link");
+  await alice.getByRole("button", { name: "Create" }).click();
+  await alice.getByRole("button", { name: "Create invite link" }).click();
+
+  const link = alice.getByLabel("Invite link");
+  await expect(link).toBeVisible();
+  const oldLink = await link.inputValue();
+
+  await alice.getByRole("button", { name: "Make a new link" }).click();
+  // The link is hidden while it saves, so wait until a different one is on screen.
+  await expect
+    .poll(async () => ((await link.count()) ? link.inputValue() : oldLink), { timeout: 10_000 })
+    .not.toBe(oldLink);
+
+  // Leaves at once, so a link shown before its write is saved would lose that write.
+  const boardUrl = alice.url();
+  await alice.goto(oldLink);
+  await expect(alice.getByRole("heading", { name: "This invite no longer works" })).toBeVisible();
+
+  await alice.goto(boardUrl);
+  await leave(alice, "Delete board");
+});

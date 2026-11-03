@@ -11,7 +11,7 @@ type Link = { inviteId: string; expiresAt: Date };
 
 export function InvitePanel({ board }: { board: Board }) {
   const user = useUser();
-  const [link, setLink] = useState<Link | null>(null);
+  const [loadedLink, setLoadedLink] = useState<Link | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,12 +25,12 @@ export function InvitePanel({ board }: { board: Board }) {
         if (!current) return;
         const usable =
           invite && invite.usedBy === null && invite.expiresAt.toMillis() > Date.now();
-        setLink(
+        setLoadedLink(
           usable ? { inviteId: invite.id, expiresAt: invite.expiresAt.toDate() } : null,
         );
       },
       () => {
-        if (current) setLink(null);
+        if (current) setLoadedLink(null);
       },
     );
     return () => {
@@ -51,6 +51,9 @@ export function InvitePanel({ board }: { board: Board }) {
     }
   }
 
+  // Firestore shows a new link locally before it's saved. Until the save finishes, the old
+  // link still works and the new one doesn't, so don't offer it to be sent (INV-3).
+  const link = busy ? null : loadedLink;
   const url = link ? `${window.location.origin}/invite/${link.inviteId}` : "";
 
   async function copy() {
@@ -89,7 +92,7 @@ export function InvitePanel({ board }: { board: Board }) {
         </>
       ) : (
         <Button className="self-start" onClick={generate} disabled={busy}>
-          Create invite link
+          {busy ? "Saving your link" : "Create invite link"}
         </Button>
       )}
       {error && (
