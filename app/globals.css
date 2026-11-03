@@ -87,3 +87,28 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Small celebration when an item is completed (UI-3). */
+@keyframes burst {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(var(--burst-angle)) translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--burst-angle)) translateY(-44px) scale(0.4);
+  }
+}
+
+.burst-dot {
+  animation: burst 620ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+
+/* The checkbox overshoots a little when ticked, for a springy feel. */
+.springy {
+  transition: transform 340ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 160ms ease;
+}
+
+.springy:active {
+  transform: scale(0.82);
+}

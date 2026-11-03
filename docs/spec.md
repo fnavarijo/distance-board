@@ -264,7 +264,7 @@ Where the two differ, this section makes requirements section 6 stricter and nev
 
 ### Test sign-in (TEST-4)
 
-- The email path sits behind a static reference to `process.env.NEXT_PUBLIC_TEST_SIGN_IN`, because dynamic lookups aren't inlined and wouldn't be removed from the build. The path is loaded through a dynamic import inside the guard, and it contains a unique marker string.
+- The email path sits behind a static reference to `process.env.NEXT_PUBLIC_TEST_SIGN_IN`, because dynamic lookups aren't inlined and wouldn't be removed from the build. The Next.js config always defines this variable, because an unset one isn't inlined either, and the code would then ship. The path is loaded through a dynamic import inside the guard, and it contains a unique marker string.
 - `next dev` doesn't load `.env.test.local`. The Playwright config loads that file itself and passes the flag to its web server's environment.
 
 ### Additions to the stack
