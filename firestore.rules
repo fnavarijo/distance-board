@@ -45,14 +45,51 @@ service cloud.firestore {
       return value is string && value.size() >= 1 && value.size() <= max;
     }
 
+    function isValidProfile(profile) {
+      return profile is map
+        && hasExactly(profile, ['name', 'photoURL'])
+        && profile.name is string
+        && profile.name.size() <= 200
+        && (profile.photoURL == null || profile.photoURL is string);
+    }
+
     match /boards/{boardId} {
       function isMember() {
         return request.auth.uid in resource.data.members;
       }
 
+      // Older boards have no map, and reading the field directly on one would deny the write.
+      function profilesBefore() {
+        return resource.data.get('memberProfiles', {});
+      }
+
+      function profilesAfter() {
+        return request.resource.data.get('memberProfiles', {});
+      }
+
+      function hasValidOwnProfile() {
+        return request.auth.uid in profilesAfter()
+          && isValidProfile(profilesAfter()[request.auth.uid]);
+      }
+
+      // The map is optional because the app before it, in old tabs too, still creates boards.
+      function isValidNewProfiles(board) {
+        return !('memberProfiles' in board) || (
+          board.memberProfiles is map
+          && board.memberProfiles.size() == 1
+          && hasValidOwnProfile()
+        );
+      }
+
+      function changedProfiles() {
+        return profilesAfter().diff(profilesBefore()).affectedKeys();
+      }
+
       function isValidNewBoard() {
         let board = request.resource.data;
-        return hasExactly(board, ['name', 'members', 'currentInviteId', 'createdBy', 'createdAt'])
+        return board.keys().hasAll(['name', 'members', 'currentInviteId', 'createdBy', 'createdAt'])
+          && board.keys().hasOnly(['name', 'members', 'currentInviteId', 'createdBy', 'createdAt', 'memberProfiles'])
+          && isValidNewProfiles(board)
           && isTextOfLength(board.name, 60)
           && board.members == [request.auth.uid]
           && board.currentInviteId == null
@@ -63,7 +100,12 @@ service cloud.firestore {
       // A member of a two-person board removes only themselves (DATA-6).
       function isLeaving() {
         return isMember()
-          && changedOnly(['members'])
+          && changedOnly(['members', 'memberProfiles'])
+          // Empty when the leaver has no entry, or leaves through an old tab of the app.
+          && (changedProfiles().size() == 0 || (
+            changedProfiles().hasOnly([request.auth.uid])
+            && !(request.auth.uid in profilesAfter())
+          ))
           && resource.data.members.size() == 2
           && request.resource.data.members == resource.data.members.removeAll([request.auth.uid]);
       }
@@ -73,7 +115,12 @@ service cloud.firestore {
       function isJoining() {
         let inviteId = resource.data.currentInviteId;
         return !isMember()
-          && changedOnly(['members'])
+          && changedOnly(['members', 'memberProfiles'])
+          // Empty when joining through an old tab of the app.
+          && (changedProfiles().size() == 0 || (
+            changedProfiles().hasOnly([request.auth.uid])
+            && hasValidOwnProfile()
+          ))
           && resource.data.members.size() == 1
           && request.resource.data.members == resource.data.members.concat([request.auth.uid])
           && inviteId != null
@@ -90,9 +137,22 @@ service cloud.firestore {
           && getAfter(invitePath(inviteId)).data.boardId == boardId;
       }
 
+      // Fills in older boards, and picks up a changed Google name or photo.
+      function isUpdatingOwnProfile() {
+        return isMember()
+          && changedOnly(['memberProfiles'])
+          && changedProfiles().hasOnly([request.auth.uid])
+          && hasValidOwnProfile();
+      }
+
       allow get, list: if isAllowed() && isMember();
       allow create: if isAllowed() && isValidNewBoard();
-      allow update: if isAllowed() && (isLeaving() || isJoining() || isReplacingInvite());
+      allow update: if isAllowed() && (
+        isLeaving()
+        || isJoining()
+        || isReplacingInvite()
+        || isUpdatingOwnProfile()
+      );
       allow delete: if isAllowed() && isMember() && resource.data.members.size() == 1;
 
       match /items/{itemId} {

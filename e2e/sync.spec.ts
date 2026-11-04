@@ -1,4 +1,7 @@
 import { type Browser, expect, type Page, test } from "@playwright/test";
+import { arrayUnion, collection, doc, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
+import { generateInvite } from "../lib/board-data";
+import { setUp, tearDown } from "../tests/accounts";
 import sweep from "./sweep";
 
 // Each test expects an empty account, even if the one before it failed partway.
@@ -248,4 +251,91 @@ test("the old invite link is dead as soon as a new link is shown", async ({ brow
 
   await alice.goto(boardUrl);
   await leave(alice, "Delete board");
+});
+
+function boardRow(page: Page, name: string) {
+  return page.getByRole("link", { name }).filter({ visible: true });
+}
+
+// Starts with a capital-sensitive "with", so it can't match "Shared with someone". Test
+// accounts may have no display name, in which case this reads "with Someone".
+const WITH_PARTNER = /^with \S/;
+
+test("the board list shows who each board is shared with", async ({ browser }) => {
+  const alice = await signedInPage(browser, 1);
+  await alice.getByLabel("Board name").fill("Shared list");
+  await alice.getByRole("button", { name: "Create" }).click();
+  await expect(alice.getByRole("heading", { name: "Shared list" })).toBeVisible();
+
+  await alice.getByRole("link", { name: "All boards" }).click();
+  await expect(alice).toHaveURL(/\/boards$/);
+  await expect(boardRow(alice, "Shared list")).toContainText("Waiting for someone to join");
+
+  await boardRow(alice, "Shared list").click();
+  await alice.getByRole("button", { name: "Create invite link" }).click();
+  const invitePath = new URL(await alice.getByLabel("Invite link").inputValue()).pathname;
+
+  const bob = await signedInPage(browser, 2, invitePath);
+  await bob.getByRole("button", { name: "Join board" }).click();
+  await expect(bob.getByRole("heading", { name: "Shared list" })).toBeVisible();
+
+  // Each person sees the other on their own row.
+  await expect(alice.getByText("The two of you").filter({ visible: true })).toBeVisible();
+  await alice.getByRole("link", { name: "All boards" }).click();
+  await expect(boardRow(alice, "Shared list").getByText(WITH_PARTNER)).toBeVisible();
+  await bob.getByRole("link", { name: "All boards" }).click();
+  await expect(boardRow(bob, "Shared list").getByText(WITH_PARTNER)).toBeVisible();
+
+  await boardRow(bob, "Shared list").click();
+  await leave(bob, "Leave board");
+
+  // The list loads once per visit, so this comes from returning to it.
+  await boardRow(alice, "Shared list").click();
+  await expect(alice.getByText("Just you so far").filter({ visible: true })).toBeVisible();
+  await alice.getByRole("link", { name: "All boards" }).click();
+  await expect(boardRow(alice, "Shared list")).toContainText("Waiting for someone to join");
+
+  await boardRow(alice, "Shared list").click();
+  await leave(alice, "Delete board");
+});
+
+test("an older board fills in a member's details when they open the app", async ({ browser }) => {
+  // Written from outside the browser, in the shape the app used before memberProfiles.
+  const accounts = await setUp();
+  try {
+    const { alice, bob } = accounts;
+    const ref = doc(collection(alice.db, "boards"));
+    await setDoc(ref, {
+      name: "Older board",
+      members: [alice.actor.uid],
+      currentInviteId: null,
+      createdBy: alice.actor.uid,
+      createdAt: serverTimestamp(),
+    });
+    const inviteId = await generateInvite(alice.db, alice.actor, {
+      id: ref.id,
+      name: "Older board",
+      currentInviteId: null,
+    });
+    const join = writeBatch(bob.db);
+    join.update(doc(bob.db, "invites", inviteId), { usedBy: bob.actor.uid });
+    join.update(doc(bob.db, "boards", ref.id), { members: arrayUnion(bob.actor.uid) });
+    await join.commit();
+
+    const alicePage = await signedInPage(browser, 1, "/boards");
+    await expect(boardRow(alicePage, "Older board")).toContainText("Shared with someone");
+
+    // One board, so `/` redirects straight to it. Syncing must survive that redirect.
+    const bobPage = await signedInPage(browser, 2);
+    await expect(bobPage.getByRole("heading", { name: "Older board" })).toBeVisible();
+
+    await expect(async () => {
+      await alicePage.reload();
+      await expect(boardRow(alicePage, "Older board").getByText(WITH_PARTNER)).toBeVisible({
+        timeout: 3_000,
+      });
+    }).toPass({ timeout: 30_000 });
+  } finally {
+    await tearDown(accounts);
+  }
 });

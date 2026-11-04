@@ -35,13 +35,21 @@ const MAX_BATCH_WRITES = 10;
 
 export type Person = { uid: string; name: string; photoURL: string | null };
 
+export type MemberProfile = Pick<Person, "name" | "photoURL">;
+
 export type Board = {
   id: string;
   name: string;
   members: string[];
   currentInviteId: string | null;
   createdBy: string;
+  memberProfiles: Record<string, MemberProfile>;
 };
+
+export type OtherMember =
+  | { status: "waiting" }
+  | { status: "partner"; person: Person }
+  | { status: "unknown" };
 
 export type Note = {
   id: string;
@@ -100,6 +108,8 @@ function toBoard(snapshot: DocumentSnapshot<DocumentData>): Board {
     members: data.members,
     currentInviteId: data.currentInviteId,
     createdBy: data.createdBy,
+    // Boards made before this field existed don't have it, and it stays optional.
+    memberProfiles: data.memberProfiles ?? {},
   };
 }
 
@@ -135,7 +145,21 @@ function toItem(snapshot: DocumentSnapshot<DocumentData>): Item {
   };
 }
 
+function profileOf({ name, photoURL }: Person): MemberProfile {
+  return { name, photoURL };
+}
+
 // Boards
+
+// Only current members are looked up, so an entry left by someone who has gone is ignored.
+export function otherMember(board: Board, uid: string): OtherMember {
+  const otherUid = board.members.find((member) => member !== uid);
+  if (!otherUid) return { status: "waiting" };
+  const profile = board.memberProfiles[otherUid];
+  return profile
+    ? { status: "partner", person: { uid: otherUid, ...profile } }
+    : { status: "unknown" };
+}
 
 export async function createBoard(
   db: Firestore,
@@ -149,6 +173,7 @@ export async function createBoard(
     currentInviteId: null,
     createdBy: actor.uid,
     createdAt: serverTimestamp(),
+    memberProfiles: { [actor.uid]: profileOf(actor) },
   });
   return ref.id;
 }
@@ -163,6 +188,27 @@ export async function listMyBoards(
   return snapshot.docs
     .map(toBoard)
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Writes the actor's entry on any board where it's missing or out of date, and says how many
+// it wrote. A failed write stays quiet, because the next list load tries again.
+export async function syncMyProfile(
+  db: Firestore,
+  actor: Person,
+  boards: readonly Board[],
+): Promise<number> {
+  const outdated = boards.filter((board) => {
+    const current = board.memberProfiles[actor.uid];
+    return current?.name !== actor.name || current?.photoURL !== actor.photoURL;
+  });
+  const writes = await Promise.allSettled(
+    outdated.map((board) =>
+      updateDoc(boardRef(db, board.id), {
+        [`memberProfiles.${actor.uid}`]: profileOf(actor),
+      }),
+    ),
+  );
+  return writes.filter((write) => write.status === "fulfilled").length;
 }
 
 export function subscribeToBoard(
@@ -206,7 +252,10 @@ export async function leaveBoard(
   const ref = boardRef(db, boardId);
   const board = toBoard(await getDoc(ref));
   if (board.members.length > 1) {
-    await updateDoc(ref, { members: arrayRemove(actor.uid) });
+    await updateDoc(ref, {
+      members: arrayRemove(actor.uid),
+      [`memberProfiles.${actor.uid}`]: deleteField(),
+    });
     return;
   }
   await deleteAllItems(db, boardId);
@@ -282,6 +331,7 @@ export async function joinBoard(
   batch.update(inviteRef(db, invite.id), { usedBy: actor.uid });
   batch.update(boardRef(db, invite.boardId), {
     members: arrayUnion(actor.uid),
+    [`memberProfiles.${actor.uid}`]: profileOf(actor),
   });
   await batch.commit();
 }

@@ -5,15 +5,15 @@ import type { Person } from "@/lib/board-data";
 
 // A plain <img> on purpose: next/image would use Vercel's image quota (COST-4). Google
 // avatar URLs can fail when a referrer is sent, and test accounts have no photo at all.
-export function Avatar({ person }: { person: Person }) {
+// `decorative` is for when the person's name is already next to it, so it isn't read twice.
+export function Avatar({ person, decorative = false }: { person: Person; decorative?: boolean }) {
   const [failed, setFailed] = useState(false);
   const label = `${person.name}'s avatar`;
 
   if (!person.photoURL || failed) {
     return (
       <span
-        role="img"
-        aria-label={label}
+        {...(decorative ? { "aria-hidden": true } : { role: "img", "aria-label": label })}
         className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold text-secondary-foreground"
       >
         {person.name.charAt(0).toUpperCase()}
@@ -25,7 +25,7 @@ export function Avatar({ person }: { person: Person }) {
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={person.photoURL}
-      alt={label}
+      alt={decorative ? "" : label}
       referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
       className="size-6 shrink-0 rounded-full object-cover"

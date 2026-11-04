@@ -118,7 +118,7 @@ Next.js is a thin shell. All data and auth run in the browser against Firebase's
 
 ### Modules
 
-The data model is the one in requirements section 6. No schema changes are made.
+The data model is the one in requirements section 6. No schema changes were made for v1. `docs/spec-board-list-labels.md` later added `memberProfiles` to boards.
 
 - **Auth module:** owns lazy Firebase initialisation, auth state, Google sign-in and sign-out, and mapping popup errors to friendly messages. It also holds the test-only email path, behind a guard.
 - **Board data module:** the only module that talks to Firestore. Every operation takes the Firestore instance and the acting user as inputs, so the UI and the rule tests can call the same code. Its interface covers:

@@ -52,6 +52,8 @@ Spark limits for reference: 1 GiB stored, 50K reads, 20K writes and 20K deletes 
 - **NAV-2:** A user with one board goes straight to it.
 - **NAV-3:** A user with several boards sees a list of them.
 - **NAV-4:** An invite link survives sign-in: the user returns to the invite afterwards.
+- **NAV-5:** Each row on the board list shows who the board is shared with: the other member's avatar and name, "Waiting for someone to join", or "Shared with someone" on an older board whose other member's details aren't known yet. See `docs/spec-board-list-labels.md`.
+- **NAV-6:** The board screen has an "All boards" link above the board name, which always goes to the board list.
 
 ### Boards
 
@@ -132,6 +134,7 @@ boards/{boardId}
   currentInviteId: string | null
   createdBy: string
   createdAt: timestamp
+  memberProfiles?: map<uid, { name, photoURL }>   // absent on older boards
 
 boards/{boardId}/items/{itemId}
   title: string
@@ -179,6 +182,7 @@ Names and photos are copied onto items and notes because there is no `users` col
 
   All of these writes require the caller to be a board member. Title, order and completion writes can't touch `notes`. Existing notes can't be changed. Add notes using a field-path update on `notes.{id}`, so concurrent writes don't overwrite each other.
 - **DATA-6 (leaving and deleting):** A member can remove only themselves from `members`. Deleting a board doesn't delete its subcollections, and there are no Cloud Functions, so when the last member leaves, the client deletes the items and current invite first and the board document last. Rules allow deleting the board only when the caller is its sole member.
+- **DATA-7 (member profiles):** A member can only add, change or remove their own `memberProfiles` entry. Entries have exactly `name` (at most 200 characters) and `photoURL` (string or null). Creating, joining and leaving may each include the caller's entry, and writes without one stay valid permanently. See `docs/spec-board-list-labels.md`.
 
 ## 7. Definition of done
 

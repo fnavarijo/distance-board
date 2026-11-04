@@ -7,7 +7,7 @@ import { useMyBoards } from "@/lib/hooks/use-my-boards";
 
 function Boards() {
   const user = useUser();
-  return <BoardsView state={useMyBoards(user.uid)} />;
+  return <BoardsView state={useMyBoards(user)} />;
 }
 
 export function BoardsScreen() {

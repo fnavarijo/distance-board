@@ -2,11 +2,35 @@
 
 import Link from "next/link";
 import { AppHeader } from "@/components/app-header";
+import { useUser } from "@/components/auth-provider";
+import { Avatar } from "@/components/avatar";
 import { CreateBoardForm } from "@/components/create-board-form";
 import { FriendlyPage } from "@/components/friendly-page";
 import { NoBoardsArt } from "@/components/illustrations";
 import { Loading } from "@/components/loading";
+import { type Board, otherMember } from "@/lib/board-data";
 import type { MyBoards } from "@/lib/hooks/use-my-boards";
+
+function SharedWith({ board }: { board: Board }) {
+  const user = useUser();
+  const other = otherMember(board, user.uid);
+  const textClass = "truncate text-sm font-semibold text-muted-foreground";
+
+  switch (other.status) {
+    case "waiting":
+      return <span className={textClass}>Waiting for someone to join</span>;
+    case "unknown":
+      return <span className={textClass}>Shared with someone</span>;
+    case "partner":
+      return (
+        <span className="flex min-w-0 items-center gap-2">
+          {/* The key resets a failed photo when a new partner takes this row. */}
+          <Avatar key={other.person.uid} person={other.person} decorative />
+          <span className={textClass}>with {other.person.name}</span>
+        </span>
+      );
+  }
+}
 
 export function BoardsView({ state }: { state: MyBoards }) {
   if (state.status === "loading") return <Loading />;
@@ -46,9 +70,10 @@ export function BoardsView({ state }: { state: MyBoards }) {
             <li key={board.id}>
               <Link
                 href={`/boards/${board.id}`}
-                className="block rounded-2xl bg-card p-4 text-lg font-bold shadow-soft transition-shadow hover:shadow-lifted"
+                className="flex flex-col gap-1 rounded-2xl bg-card p-4 shadow-soft transition-shadow hover:shadow-lifted"
               >
-                {board.name}
+                <span className="truncate text-lg font-bold">{board.name}</span>
+                <SharedWith board={board} />
               </Link>
             </li>
           ))}

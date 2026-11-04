@@ -11,7 +11,7 @@ import { useMyBoards } from "@/lib/hooks/use-my-boards";
 function Resolver() {
   const user = useUser();
   const router = useRouter();
-  const state = useMyBoards(user.uid);
+  const state = useMyBoards(user);
   const onlyBoard =
     state.status === "ready" && state.boards.length === 1 ? state.boards[0].id : null;
 

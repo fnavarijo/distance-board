@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { AppHeader } from "@/components/app-header";
@@ -72,6 +73,12 @@ function BoardContent({ boardId }: { boardId: string }) {
     <>
       <AppHeader />
       <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-5 pt-6 pb-16">
+        <Link
+          href="/boards"
+          className="-my-2 self-start py-2 font-semibold text-muted-foreground hover:text-foreground"
+        >
+          <span aria-hidden>← </span>All boards
+        </Link>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-3xl leading-tight break-words">{board.name}</h1>
